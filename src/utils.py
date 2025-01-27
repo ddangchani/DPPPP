@@ -483,23 +483,31 @@ def add_Gaussian_Noise(data, window, scale_DP, n=11, seed=None):
 
 def add_Laplace_noise(data, window, eps, n=11, seed=None):
     """
-    Laplace Mechanism Histogram synthesis
+    Laplace Mechanism Histogram synthesis for the square window
     """
     if seed is not None:
         np.random.seed(seed)
     x = np.linspace(window[0], window[1], n)
     y = np.linspace(window[2], window[3], n)
 
+    cell_size = (x[1] - x[0]) * (y[1] - y[0])
+    sens = 2 / cell_size
+
     # Count
     hist_ = np.histogram2d(data[:, 0], data[:, 1], bins=[x, y])[0]
+    int_ = hist_ / cell_size
 
     # Add noise
-    hist_ += np.random.laplace(0, 1/eps, hist_.shape)
-    hist_ = np.clip(hist_, 0, None)
+    # hist_ += np.random.laplace(0, 2/eps, hist_.shape)
+    # hist_ = np.clip(hist_, 0, None)
+    int_ += np.random.laplace(0, sens/eps, int_.shape)
+    int_ = np.clip(int_, 0, None)
+    mean_ = int_ * cell_size
     
     # Generate new points
     newpts_DP = []
-    npoints_DP = np.random.poisson(lam=hist_)
+    # npoints_DP = np.random.poisson(lam=hist_)
+    npoints_DP = np.random.poisson(lam=mean_)
 
     for i in range(n-1):
         for j in range(n-1):

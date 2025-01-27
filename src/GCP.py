@@ -34,7 +34,7 @@ class Resistancecov_Matern(pm.gp.cov.Covariance):
 class Resistancecov_exp(pm.gp.cov.Covariance):
     def __init__(self, sigma, linnet, ls, alpha=1.):
         super(Resistancecov_exp, self).__init__(2, None)
-        self.alpha = alpha # shape parameter > (0, 1] for power exponential and (0, 1/2] for Matern
+        self.alpha = alpha # shape parameter > (0, 1] for power exponential
         self.sigma = sigma # variance
         self.linnet = linnet
         self.ls = ls # lengthscale

@@ -553,7 +553,7 @@ correction=True):
     fromstart = dGmat[snapped.node_start, :] + d_start
     fromend = dGmat[snapped.node_end, :] + d_end
     tk = np.minimum(fromstart, fromend)
-    snaps = snapped.snap.values
+    snaps = snapped['snap'].values
 
     for i in range(n):
         for j in range(i+1, n):
