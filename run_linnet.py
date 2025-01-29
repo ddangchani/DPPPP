@@ -26,7 +26,10 @@ parser.add_argument('--resolution', type=float, default=50.0, help='Resolution f
 parser.add_argument('--seed', type=int, default=0, help='Random seed')
 parser.add_argument('--rep', type=int, default=30, help='Number of synthetic datasets')
 parser.add_argument('--burnin', type=int, default=10000, help='Number of burn-in samples')
+parser.add_argument('--plot', action='store_true', help='Plot the results')
 args = parser.parse_args()
+
+print(args)
 # Load Data
 crime = gpd.read_file('data/collapsed/crimes.shp')
 street = gpd.read_file('data/collapsed/streets.shp')
@@ -116,7 +119,7 @@ intensities_list = []
 
 n_sample = args.rep
 
-for i in tqdm(range(n_sample)):
+for i in tqdm(range(n_sample), desc='Synthetic Data (LGCP)'):
     sample = trace.posterior.weights.values[0][-i].reshape(-1, 1)
 
     # Thinning
@@ -137,49 +140,60 @@ for i in tqdm(range(n_sample)):
 
 # Plot K function comparison
 
-rs = np.linspace(0, 800, 100)
-
-fig1, ax1 = plt.subplots(1, 1, figsize=(5, 5))
+rs = np.linspace(50, 800, 100)
 
 # Original data
 K_original = K_est_linnet_hom(points=crime.geometry, linnet=linnet, r_values=rs, correction=True)
-ax1.plot(rs, K_original, color='tab:red', label='Original Data')
 
-# Synthetic data
-K_synth = np.zeros((n_sample, len(rs)))
-for i in tqdm(range(n_sample)):
-    K_synth[i] = K_est_linnet_inhom(points=newpts_list[i], intensities=intensities_list[i], linnet=linnet, r_values=rs, correction=True)
-K_synth_mean = np.mean(K_synth, axis=0)
-K_synth_upper = np.percentile(K_synth, 97.5, axis=0)
-K_synth_lower = np.percentile(K_synth, 2.5, axis=0)
-ax1.plot(rs, K_synth_mean, color='tab:blue', label='Synthetic Data')
-ax1.fill_between(rs, K_synth_upper, K_synth_lower, color='tab:blue', alpha=0.3)
-ax1.set_xlabel('r (m)')
-ax1.set_ylabel('K(r)')
-ax1.legend(loc='upper left', fontsize=12)
-fig1.tight_layout()
-fig1.savefig(f'plots/linnet_K_comparison_eps_{eps}.pdf', transparent=True)
+if args.plot:
+    fig1, ax1 = plt.subplots(1, 1, figsize=(5, 5))
+    ax1.plot(rs, K_original, color='tab:red', label='Original Data')
+
+# # Synthetic data
+# K_synth = np.zeros((n_sample, len(rs)))
+# for i in tqdm(range(n_sample), desc='K function (LGCP)'):
+#     K_synth[i] = K_est_linnet_hom(points=newpts_list[i], linnet=linnet, r_values=rs, correction=True)
+# K_synth_mean = np.mean(K_synth, axis=0)
+# K_synth_upper = np.percentile(K_synth, 97.5, axis=0)
+# K_synth_lower = np.percentile(K_synth, 2.5, axis=0)
+
+if args.plot:
+    ax1.plot(rs, K_synth_mean, color='tab:blue', label='Synthetic Data')
+    ax1.fill_between(rs, K_synth_upper, K_synth_lower, color='tab:blue', alpha=0.3)
+    ax1.set_xlabel('r (m)')
+    ax1.set_ylabel('K(r)')
+    ax1.legend(loc='upper left', fontsize=12)
+    fig1.tight_layout()
+    fig1.savefig(f'plots/linnet_K_comparison_eps_{eps}.pdf', transparent=True)
 
 # Laplace Mechanism
+sens = 2 / discretized.edges.mm_len.min() # L1 sens
 hist = discretized.edges['count']
+int_ = discretized.edges['count'] / discretized.edges['mm_len']
 newpts_Laplace = []
-for i in tqdm(range(n_sample)):
-    hist_perturbed = hist + np.random.laplace(0, 1/eps, hist.shape)
-    hist_perturbed = np.maximum(hist_perturbed.astype(int), 0)
-    count_Lap = np.random.poisson(hist_perturbed)
-    newpts_perturbed = discretized.edges.sample_points(count_Lap).dropna().explode().reset_index(drop=True)
-    newpts_Laplace.append(newpts_perturbed)
-
+int_Laplace = []
+for i in tqdm(range(n_sample), desc='Synthetic Data (Laplace)'):
+    int_perturbed = int_ + np.random.laplace(0, sens/eps, int_.shape)
+    int_perturbed = np.maximum(int_perturbed, 0)
+    mean_ = int_perturbed * discretized.edges['mm_len']
+    count_Lap = np.random.poisson(mean_)
+    newpts_lap = discretized.edges.sample_points(count_Lap).dropna().explode()
+    newpts_Laplace.append(newpts_lap)
+    indices = newpts_lap.index.get_level_values(0)
+    int_Laplace.append(int_perturbed[indices])
+    
 # Plot K function comparison
-fig2, ax2 = plt.subplots(1, 1, figsize=(5, 5))
 
 # Original data
 K_original = K_est_linnet_hom(points=crime.geometry, linnet=linnet, r_values=rs, correction=True)
-ax2.plot(rs, K_original, color='tab:red', label='Original Data')
+
+if args.plot:
+    fig2, ax2 = plt.subplots(1, 1, figsize=(5, 5))
+    ax2.plot(rs, K_original, color='tab:red', label='Original Data')
 
 # Synthetic data (LM)
 K_Laplace = np.zeros((n_sample, len(rs)))
-for i in tqdm(range(n_sample)):
+for i in tqdm(range(n_sample), desc='K function (Laplace)'):
     K_Laplace[i] = K_est_linnet_hom(points=newpts_Laplace[i], linnet=linnet, r_values=rs, correction=True)
 
 # Drop NA
@@ -188,14 +202,14 @@ K_Laplace_mean = np.mean(K_Laplace, axis=0)
 K_Laplace_upper = np.percentile(K_Laplace, 97.5, axis=0)
 K_Laplace_lower = np.percentile(K_Laplace, 2.5, axis=0)
 
-ax2.plot(rs, K_Laplace_mean, color='tab:green', label='Laplace Mechanism')
-ax2.fill_between(rs, K_Laplace_upper, K_Laplace_lower, color='tab:green', alpha=0.3)
-
-ax2.set_xlabel('r (m)')
-ax2.set_ylabel('K(r)')
-ax2.legend(loc='upper left', fontsize=12)
-fig2.tight_layout()
-fig2.savefig(f'plots/linnet_K_comparison_Laplace_eps_{eps}_seed_{args.seed}.pdf', transparent=True)
+if args.plot:
+    ax2.plot(rs, K_Laplace_mean, color='tab:green', label='Laplace Mechanism')
+    ax2.fill_between(rs, K_Laplace_upper, K_Laplace_lower, color='tab:green', alpha=0.3)
+    ax2.set_xlabel('r (m)')
+    ax2.set_ylabel('K(r)')
+    ax2.legend(loc='upper left', fontsize=12)
+    fig2.tight_layout()
+    fig2.savefig(f'plots/linnet_K_comparison_Laplace_eps_{eps}_seed_{args.seed}.pdf', transparent=True)
 
 # K function MISE
 dr = rs[1] - rs[0]

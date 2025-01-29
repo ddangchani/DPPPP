@@ -481,7 +481,7 @@ def add_Gaussian_Noise(data, window, scale_DP, n=11, seed=None):
     newpts_DP = np.vstack(newpts_DP)
     return newpts_DP
 
-def add_Laplace_noise(data, window, eps, n=11, seed=None):
+def add_Laplace_noise(data, window, eps, n=11, seed=None, return_intensity=False):
     """
     Laplace Mechanism Histogram synthesis for the square window
     """
@@ -506,6 +506,7 @@ def add_Laplace_noise(data, window, eps, n=11, seed=None):
     
     # Generate new points
     newpts_DP = []
+    newpts_int = []
     # npoints_DP = np.random.poisson(lam=hist_)
     npoints_DP = np.random.poisson(lam=mean_)
 
@@ -515,6 +516,13 @@ def add_Laplace_noise(data, window, eps, n=11, seed=None):
             _x = np.random.uniform(x[i], x[i+1], npt)
             _y = np.random.uniform(y[j], y[j+1], npt)
             newpts_DP.append(np.vstack([_x, _y]).T)
+            newpts_int.append(np.ones(npt) * int_[i, j])
 
     newpts_DP = np.vstack(newpts_DP)
-    return newpts_DP
+    newpts_int = np.hstack(newpts_int)
+
+    if return_intensity:
+        return newpts_DP, newpts_int, int_
+
+    else:
+        return newpts_DP
