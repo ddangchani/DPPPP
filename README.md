@@ -1,6 +1,8 @@
 # DPPPP: Differentially Private synthesis with Poisson Point Process
 
-Repository for *Differential Privacy for Spatial Point Process, (2025).*
+Repository for *Differentially private synthesis of Spatial Point Processes, (2025)*
+
+Arxiv link : [https://arxiv.org/abs/2502.18198](https://arxiv.org/abs/2502.18198)
 
 ## Usage
 
